@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LOCK TUMBLER - Pin Precision</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; }
+    body { background: #050508; color: #00d2ff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
+    #hud { width: 360px; display: flex; justify-content: space-between; font-size: 0.65rem; margin-bottom: 15px; color: #8888aa; }
+    canvas { background: #080812; border: 3px solid #1a1a3a; box-shadow: 0 0 25px rgba(0, 210, 255, 0.2); border-radius: 50%; cursor: pointer; }
+    .controls-hint { margin-top: 15px; font-size: 0.55rem; color: #444466; text-align: center; }
+    .back-btn { text-decoration: none; color: #8888aa; font-size: 0.6rem; margin-top: 15px; }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <span>STAGE: <span id="stage">1</span>/3</span>
+    <span>STATUS: <span id="status" style="color:#00ff88;">ROTATING</span></span>
+  </div>
+  <canvas id="canvas" width="360" height="360"></canvas>
+  <div class="controls-hint">[SPACEBAR or CLICK] LOCK TUMBLER IN GREEN ZONE</div>
+  <a href="index.html" class="back-btn">&lt; RETURN TO TERMINAL</a>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    let currentRing = 0;
+    const rings = [
+      { r: 140, speed: 0.03, angle: 0, targetStart: 1.0, targetEnd: 1.6, locked: false },
+      { r: 100, speed: -0.045, angle: 0, targetStart: 3.2, targetEnd: 3.8, locked: false },
+      { r: 60,  speed: 0.06, angle: 0, targetStart: 4.5, targetEnd: 5.0, locked: false }
+    ];
+
+    function update() {
+      rings.forEach((ring, idx) => {
+        if (!ring.locked) {
+          ring.angle = (ring.angle + ring.speed) % (Math.PI * 2);
+          if (ring.angle < 0) ring.angle += Math.PI * 2;
+        }
+      });
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+
+      rings.forEach((ring, idx) => {
+        // Draw Track Ring
+        ctx.beginPath();
+        ctx.arc(cx, cy, ring.r, 0, Math.PI * 2);
+        ctx.strokeStyle = idx === currentRing ? '#1a1a3a' : '#0d0d1a';
+        ctx.lineWidth = 14;
+        ctx.stroke();
+
+        // Draw Target Zone
+        ctx.beginPath();
+        ctx.arc(cx, cy, ring.r, ring.targetStart, ring.targetEnd);
+        ctx.strokeStyle = ring.locked ? '#00ff88' : '#00ff8866';
+        ctx.lineWidth = 14;
+        ctx.stroke();
+
+        // Draw Rotating Pointer
+        const px = cx + Math.cos(ring.angle) * ring.r;
+        const py = cy + Math.sin(ring.angle) * ring.r;
+        ctx.beginPath();
+        ctx.arc(px, py, 9, 0, Math.PI * 2);
+        ctx.fillStyle = ring.locked ? '#00ff88' : (idx === currentRing ? '#ff0055' : '#8888aa');
+        ctx.fill();
+        ctx.shadowBlur = idx === currentRing ? 10 : 0;
+        ctx.shadowColor = '#ff0055';
+      });
+      ctx.shadowBlur = 0;
+    }
+
+    function triggerLock() {
+      if (currentRing >= 3) return;
+      const ring = rings[currentRing];
+
+      if (ring.angle >= ring.targetStart && ring.angle <= ring.targetEnd) {
+        ring.locked = true;
+        currentRing++;
+        document.getElementById('stage').textContent = Math.min(3, currentRing + 1);
+
+        if (currentRing === 3) {
+          document.getElementById('status').textContent = 'UNLOCKED!';
+          document.getElementById('status').style.color = '#00ff88';
+        }
+      } else {
+        // Reset progress on miss
+        currentRing = 0;
+        rings.forEach(r => r.locked = false);
+        document.getElementById('stage').textContent = 1;
+        document.getElementById('status').textContent = 'FAULT!';
+        document.getElementById('status').style.color = '#ff0055';
+        setTimeout(() => {
+          document.getElementById('status').textContent = 'ROTATING';
+          document.getElementById('status').style.color = '#00ff88';
+        }, 600);
+      }
+    }
+
+    window.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); triggerLock(); } });
+    canvas.addEventListener('click', triggerLock);
+
+    function loop() {
+      update();
+      render();
+      requestAnimationFrame(loop);
+    }
+    loop();
+  </script>
+</body>
+</html>

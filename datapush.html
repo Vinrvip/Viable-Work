@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DATA PUSH - Firewall Sokoban</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; }
+    body { background: #050508; color: #00d2ff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
+    #game-card { background: #080812; border: 3px solid #1a1a3a; padding: 20px; border-radius: 8px; box-shadow: 0 0 25px rgba(0, 210, 255, 0.2); }
+    h1 { color: #ff0055; font-size: 1.1rem; margin-bottom: 12px; text-shadow: 2px 2px 0 #00d2ff; text-align: center; }
+    .hud { display: flex; justify-content: space-between; font-size: 0.65rem; color: #8888aa; margin-bottom: 15px; }
+    #grid { display: grid; grid-template-columns: repeat(7, 45px); gap: 4px; background: #030306; padding: 8px; border: 2px solid #1a1a3a; border-radius: 6px; }
+    .cell { width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; border-radius: 3px; }
+    .wall { background: #1a1a3a; border: 1px solid #2a2a5a; }
+    .floor { background: #0a0a14; }
+    .target { background: #0a1a14; border: 2px dashed #00ff88; }
+    .box { background: #331100; border: 2px solid #ffaa00; color: #ffaa00; font-size: 0.6rem; }
+    .box-on-target { background: #003311; border: 2px solid #00ff88; color: #00ff88; box-shadow: 0 0 8px #00ff88; }
+    .player { background: #002244; border: 2px solid #00d2ff; color: #00d2ff; box-shadow: 0 0 8px #00d2ff; }
+    .controls-hint { margin-top: 15px; font-size: 0.55rem; color: #444466; text-align: center; }
+    .back-btn { text-decoration: none; color: #8888aa; font-size: 0.6rem; display: block; text-align: center; margin-top: 15px; }
+  </style>
+</head>
+<body>
+  <div id="game-card">
+    <h1>DATA PUSH</h1>
+    <div class="hud">
+      <span>MOVES: <span id="moves">0</span></span>
+      <span>STATUS: <span id="status" style="color:#00ff88;">LOCKING</span></span>
+    </div>
+    <div id="grid"></div>
+    <div class="controls-hint">[ARROWS] MOVE & PUSH CRATES TO TARGETS</div>
+    <a href="index.html" class="back-btn">&lt; RETURN TO TERMINAL</a>
+  </div>
+
+  <script>
+    // Map layout: W=Wall, _=Floor, T=Target, B=Box, P=Player
+    const mapLayout = [
+      'W','W','W','W','W','W','W',
+      'W','_','_','W','_','T','W',
+      'W','_','B','_','B','T','W',
+      'W','W','_','P','_','W','W',
+      'W','_','_','W','_','_','W',
+      'W','_','_','_','_','_','W',
+      'W','W','W','W','W','W','W'
+    ];
+
+    const targets = [12, 19];
+    let grid = [...mapLayout];
+    let moves = 0;
+
+    function render() {
+      const container = document.getElementById('grid');
+      container.innerHTML = '';
+      grid.forEach((type, idx) => {
+        const cell = document.createElement('div');
+        cell.className = 'cell ';
+        const isTarget = targets.includes(idx);
+
+        if (type === 'W') cell.className += 'wall';
+        else if (type === 'P') { cell.className += 'player'; cell.textContent = 'P'; }
+        else if (type === 'B') {
+          cell.className += isTarget ? 'box-on-target' : 'box';
+          cell.textContent = 'DATA';
+        } else if (isTarget) {
+          cell.className += 'target';
+        } else {
+          cell.className += 'floor';
+        }
+        container.appendChild(cell);
+      });
+      document.getElementById('moves').textContent = moves;
+    }
+
+    function getPos(idx, dir) {
+      if (dir === 'ArrowUp') return idx - 7;
+      if (dir === 'ArrowDown') return idx + 7;
+      if (dir === 'ArrowLeft') return idx - 1;
+      if (dir === 'ArrowRight') return idx + 1;
+      return idx;
+    }
+
+    window.addEventListener('keydown', e => {
+      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+      e.preventDefault();
+
+      const pIdx = grid.indexOf('P');
+      const nIdx = getPos(pIdx, e.key);
+
+      if (grid[nIdx] === 'W') return;
+
+      if (grid[nIdx] === 'B') {
+        const nnIdx = getPos(nIdx, e.key);
+        if (grid[nnIdx] === '_' || targets.includes(nnIdx) && grid[nnIdx] !== 'B') {
+          grid[nnIdx] = 'B';
+          grid[nIdx] = 'P';
+          grid[pIdx] = '_';
+          moves++;
+        }
+      } else {
+        grid[nIdx] = 'P';
+        grid[pIdx] = '_';
+        moves++;
+      }
+
+      render();
+      checkWin();
+    });
+
+    function checkWin() {
+      const win = targets.every(tIdx => grid[tIdx] === 'B');
+      if (win) {
+        document.getElementById('status').textContent = 'CLEARED!';
+        document.getElementById('status').style.color = '#00ff88';
+      }
+    }
+
+    render();
+  </script>
+</body>
+</html>

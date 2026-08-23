@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PACKET LANDER - Gravity Dock</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; }
+    body { background: #050508; color: #00d2ff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    #hud { width: 480px; display: flex; justify-content: space-between; font-size: 0.6rem; margin-bottom: 10px; color: #8888aa; }
+    canvas { background: #080812; border: 3px solid #1a1a3a; box-shadow: 0 0 25px rgba(0, 210, 255, 0.2); }
+    .controls-hint { margin-top: 12px; font-size: 0.55rem; color: #444466; text-align: center; }
+    .back-btn { text-decoration: none; color: #8888aa; font-size: 0.6rem; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <span>FUEL: <span id="fuel">100</span>%</span>
+    <span>SPEED: <span id="speed">0.0</span></span>
+    <span>STATUS: <span id="status" style="color:#00ff88;">ALIGNED</span></span>
+  </div>
+  <canvas id="canvas" width="480" height="380"></canvas>
+  <div class="controls-hint">[LEFT/RIGHT] ROTATE &middot; [UP] THRUST</div>
+  <a href="index.html" class="back-btn">&lt; RETURN TO TERMINAL</a>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    const lander = { x: 240, y: 50, vx: 0, vy: 0, angle: 0, fuel: 100, alive: true, landed: false };
+    const pad = { x: 200, w: 80, y: 340 };
+    const keys = {};
+
+    window.addEventListener('keydown', e => keys[e.code] = true);
+    window.addEventListener('keyup', e => keys[e.code] = false);
+
+    function update() {
+      if (!lander.alive || lander.landed) return;
+
+      if (keys['ArrowLeft']) lander.angle -= 0.05;
+      if (keys['ArrowRight']) lander.angle += 0.05;
+
+      if (keys['ArrowUp'] && lander.fuel > 0) {
+        lander.vx += Math.sin(lander.angle) * 0.08;
+        lander.vy -= Math.cos(lander.angle) * 0.08;
+        lander.fuel = Math.max(0, lander.fuel - 0.25);
+      }
+
+      lander.vy += 0.03; // Gravity
+      lander.x += lander.vx;
+      lander.y += lander.vy;
+
+      const spd = Math.sqrt(lander.vx * lander.vx + lander.vy * lander.vy);
+      document.getElementById('fuel').textContent = Math.round(lander.fuel);
+      document.getElementById('speed').textContent = spd.toFixed(1);
+
+      // Collision Check
+      if (lander.y >= pad.y - 8) {
+        if (lander.x >= pad.x && lander.x <= pad.x + pad.w && spd < 1.8 && Math.abs(lander.angle) < 0.25) {
+          lander.landed = true;
+          document.getElementById('status').textContent = 'DOCKED OK';
+          document.getElementById('status').style.color = '#00ff88';
+        } else {
+          lander.alive = false;
+          document.getElementById('status').textContent = 'CRASHED';
+          document.getElementById('status').style.color = '#ff0055';
+        }
+      }
+
+      // Boundary check
+      if (lander.x < 0 || lander.x > canvas.width || lander.y > canvas.height) {
+        lander.alive = false;
+        document.getElementById('status').textContent = 'SIGNAL LOST';
+        document.getElementById('status').style.color = '#ff0055';
+      }
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Landing pad
+      ctx.fillStyle = '#00ff88';
+      ctx.fillRect(pad.x, pad.y, pad.w, 6);
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = '#00ff88';
+
+      // Lander
+      ctx.save();
+      ctx.translate(lander.x, lander.y);
+      ctx.rotate(lander.angle);
+      ctx.fillStyle = lander.alive ? '#00d2ff' : '#ff0055';
+      ctx.beginPath();
+      ctx.moveTo(0, -10);
+      ctx.lineTo(-8, 10);
+      ctx.lineTo(8, 10);
+      ctx.closePath();
+      ctx.fill();
+
+      // Thrust effect
+      if (keys['ArrowUp'] && lander.fuel > 0 && lander.alive) {
+        ctx.fillStyle = '#ff0055';
+        ctx.beginPath();
+        ctx.moveTo(-4, 11);
+        ctx.lineTo(0, 19);
+        ctx.lineTo(4, 11);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+      ctx.shadowBlur = 0;
+    }
+
+    function loop() {
+      update();
+      render();
+      requestAnimationFrame(loop);
+    }
+    loop();
+  </script>
+</body>
+</html>
