@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Viable Works - DATA LOOP</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; user-select: none; }
+    body { background-color: #050508; color: #ffffff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden;}
+    .crt::before { content: " "; display: block; position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%); pointer-events: none; z-index: 100; }
+    #game-wrapper { width: 450px; background: #080812; border: 4px solid #1a1a3a; box-shadow: 0 0 20px rgba(0, 210, 255, 0.2); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; align-items: center; z-index: 10; }
+    .hud { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #00d2ff; padding-bottom: 10px; }
+    .back-btn { background: transparent; color: #ff0055; border: 2px solid #ff0055; padding: 8px 12px; font-size: 0.7rem; cursor: pointer; text-decoration: none; transition: 0.2s; }
+    .back-btn:hover { background: #ff0055; color: #000; box-shadow: 0 0 10px #ff0055; }
+    .score-board { text-align: right; }
+    #score { color:#00d2ff; font-size:0.8rem; margin-bottom: 5px; }
+    #high-score { color:#8888aa; font-size:0.6rem; }
+    #game-area { position: relative; }
+    canvas { border: 2px solid #333355; background: #050508; display: block; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); }
+    #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 5, 8, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 20; border: 2px solid #333355; }
+    .action-btn { background: #111122; color: #00d2ff; border: 2px solid #00d2ff; padding: 15px 20px; font-size: 0.8rem; cursor: pointer; transition: 0.2s; }
+    .action-btn:hover { background: #00d2ff; color: #000; box-shadow: 0 0 15px #00d2ff; }
+    #overlay-msg { color: #ff0055; font-size: 0.8rem; margin-bottom: 20px; display: none; text-align:center; line-height: 1.5; }
+    #controls-hint { color: #8888aa; font-size: 0.6rem; margin-top: 15px; text-align: center; line-height: 1.6;}
+  </style>
+</head>
+<body class="crt">
+  <div id="game-wrapper">
+    <div class="hud">
+      <a href="index.html" class="back-btn">◄ SYS.DIR</a>
+      <div class="score-board">
+        <div id="score">DATA: 000</div>
+        <div id="high-score">LOOP: STABLE</div>
+      </div>
+    </div>
+    <div id="game-area">
+      <canvas id="canvas" width="400" height="400"></canvas>
+      <div id="overlay">
+        <div id="overlay-msg">LOOP CORRUPTED</div>
+        <button class="action-btn" onclick="startGame()">INITIATE LOOP</button>
+        <div id="controls-hint">[SPACE / CLICK / KEYS]<br>Switch between inner & outer orbit.<br>Collect cyan nodes & dodge red spikes.</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('overlay');
+
+    const CENTER_X = canvas.width / 2;
+    const CENTER_Y = canvas.height / 2;
+    const RINGS = [75, 140]; // Inner and Outer ring radii
+
+    let player = {
+      ringIndex: 0,
+      angle: 0,
+      radius: RINGS[0],
+      targetRadius: RINGS[0],
+      size: 10
+    };
+
+    let score = 0;
+    let gameActive = false;
+    let animationId;
+    let hazards = [];
+    let dataNode = null;
+
+    function switchRing() {
+      if (!gameActive) return;
+      player.ringIndex = player.ringIndex === 0 ? 1 : 0;
+      player.targetRadius = RINGS[player.ringIndex];
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyS'].includes(e.code)) {
+        e.preventDefault();
+        switchRing();
+      }
+    });
+
+    canvas.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      switchRing();
+    });
+
+    function spawnDataNode() {
+      const ringIdx = Math.floor(Math.random() * RINGS.length);
+      const angle = Math.random() * Math.PI * 2;
+      dataNode = { ringIndex: ringIdx, angle: angle, size: 8 };
+    }
+
+    function spawnHazard() {
+      // Maximum hazard cap scales up with score (1 hazard at start, up to 5)
+      const maxHazards = Math.min(5, 1 + Math.floor(score / 4));
+      if (hazards.length >= maxHazards) return;
+
+      const ringIdx = Math.floor(Math.random() * RINGS.length);
+      let angle = player.angle + Math.PI + (Math.random() - 0.5);
+      
+      // Hazard speed scales up smoothly with score
+      const speedMultiplier = 1 + (score * 0.035);
+      const baseSpeed = 0.008 + (Math.random() * 0.004);
+
+      hazards.push({
+        ringIndex: ringIdx,
+        angle: angle,
+        speed: baseSpeed * speedMultiplier,
+        size: 9
+      });
+    }
+
+    function startGame() {
+      overlay.style.display = 'none';
+      score = 0;
+      player.ringIndex = 0;
+      player.radius = RINGS[0];
+      player.targetRadius = RINGS[0];
+      player.angle = 0;
+      hazards = [];
+      gameActive = true;
+      updateScore();
+      spawnDataNode();
+      spawnHazard();
+      if (animationId) cancelAnimationFrame(animationId);
+      update();
+    }
+
+    function updateScore() {
+      document.getElementById('score').innerText = "DATA: " + (score < 10 ? "00" + score : (score < 100 ? "0" + score : score));
+      
+      // Update high-score status text based on difficulty progression
+      const statusText = document.getElementById('high-score');
+      if (score >= 20) statusText.innerText = "LOOP: CRITICAL";
+      else if (score >= 10) statusText.innerText = "LOOP: UNSTABLE";
+      else statusText.innerText = "LOOP: STABLE";
+    }
+
+    function update() {
+      if (!gameActive) return;
+
+      // Player speed increases smoothly as score goes up
+      const currentRotationSpeed = 0.018 + (score * 0.0008);
+      player.angle += currentRotationSpeed;
+
+      // Smooth transition between rings
+      player.radius += (player.targetRadius - player.radius) * 0.25;
+
+      // Update hazards
+      hazards.forEach(h => {
+        h.angle += h.speed;
+      });
+
+      // Spawning chance increases with higher score
+      const spawnChance = 0.008 + (score * 0.001);
+      if (Math.random() < spawnChance) spawnHazard();
+
+      // Check Data Collection
+      if (dataNode && player.ringIndex === dataNode.ringIndex) {
+        let angleDiff = Math.abs(player.angle % (Math.PI * 2) - dataNode.angle % (Math.PI * 2));
+        if (angleDiff > Math.PI) angleDiff = (Math.PI * 2) - angleDiff;
+        
+        if (angleDiff < 0.25) { 
+          score++;
+          updateScore();
+          spawnDataNode();
+          spawnHazard();
+        }
+      }
+
+      // Collision Check with Hazards (Hitbox shrinks slightly as speeds rise to keep it fair)
+      const hitThreshold = Math.max(0.08, 0.12 - (score * 0.001));
+      for (let h of hazards) {
+        if (player.ringIndex === h.ringIndex && Math.abs(player.radius - player.targetRadius) < 5) {
+          let angleDiff = Math.abs(player.angle % (Math.PI * 2) - h.angle % (Math.PI * 2));
+          if (angleDiff > Math.PI) angleDiff = (Math.PI * 2) - angleDiff;
+
+          if (angleDiff < hitThreshold) {
+            triggerGameOver();
+            return;
+          }
+        }
+      }
+
+      // Render
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw Orbit Rings
+      RINGS.forEach((r, idx) => {
+        ctx.beginPath();
+        ctx.arc(CENTER_X, CENTER_Y, r, 0, Math.PI * 2);
+        ctx.strokeStyle = idx === player.ringIndex ? 'rgba(0, 210, 255, 0.4)' : 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = idx === player.ringIndex ? 3 : 1;
+        ctx.stroke();
+      });
+
+      // Draw Data Node
+      if (dataNode) {
+        const nx = CENTER_X + RINGS[dataNode.ringIndex] * Math.cos(dataNode.angle);
+        const ny = CENTER_Y + RINGS[dataNode.ringIndex] * Math.sin(dataNode.angle);
+        ctx.fillStyle = '#00ffaa';
+        ctx.beginPath();
+        ctx.arc(nx, ny, dataNode.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowColor = '#00ffaa';
+        ctx.shadowBlur = 10;
+      }
+
+      // Draw Hazards
+      hazards.forEach(h => {
+        const hx = CENTER_X + RINGS[h.ringIndex] * Math.cos(h.angle);
+        const hy = CENTER_Y + RINGS[h.ringIndex] * Math.sin(h.angle);
+        ctx.fillStyle = '#ff0055';
+        ctx.beginPath();
+        ctx.arc(hx, hy, h.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowColor = '#ff0055';
+        ctx.shadowBlur = 8;
+      });
+
+      // Draw Player
+      const px = CENTER_X + player.radius * Math.cos(player.angle);
+      const py = CENTER_Y + player.radius * Math.sin(player.angle);
+      ctx.fillStyle = '#00d2ff';
+      ctx.beginPath();
+      ctx.arc(px, py, player.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowColor = '#00d2ff';
+      ctx.shadowBlur = 12;
+
+      ctx.shadowBlur = 0;
+
+      if (gameActive) animationId = requestAnimationFrame(update);
+    }
+
+    function triggerGameOver() {
+      gameActive = false;
+      document.getElementById('overlay-msg').style.display = 'block';
+      document.querySelector('.action-btn').innerText = "RECALIBRATE";
+      document.getElementById('controls-hint').style.display = 'none';
+      overlay.style.display = 'flex';
+    }
+  </script>
+</body>
+</html>

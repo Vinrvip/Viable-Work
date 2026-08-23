@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Viable Works - KERNEL PANIC</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; user-select: none; }
+    body { background-color: #050508; color: #ffffff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .crt::before { content: " "; display: block; position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%); pointer-events: none; z-index: 100; }
+    
+    #game-wrapper { width: 450px; background: #080812; border: 4px solid #1a1a3a; box-shadow: 0 0 20px rgba(0, 210, 255, 0.2); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; align-items: center; z-index: 10; }
+    
+    .hud { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #00d2ff; padding-bottom: 10px; }
+    .back-btn { background: transparent; color: #ff0055; border: 2px solid #ff0055; padding: 8px 12px; font-size: 0.7rem; cursor: pointer; text-decoration: none; transition: 0.2s; }
+    .back-btn:hover { background: #ff0055; color: #000; box-shadow: 0 0 10px #ff0055; }
+    
+    .score-board { text-align: right; }
+    #score { color:#00d2ff; font-size:0.8rem; margin-bottom: 5px; }
+    #high-score { color:#8888aa; font-size:0.6rem; }
+    
+    #game-area { position: relative; }
+    canvas { border: 2px solid #333355; background: #050508; display: block; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); cursor: crosshair; }
+    
+    #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 5, 8, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 20; border: 2px solid #333355; }
+    .action-btn { background: #111122; color: #00d2ff; border: 2px solid #00d2ff; padding: 15px 20px; font-size: 0.8rem; cursor: pointer; transition: 0.2s; }
+    .action-btn:hover { background: #00d2ff; color: #000; box-shadow: 0 0 15px #00d2ff; }
+    #overlay-msg { color: #ff0055; font-size: 0.8rem; margin-bottom: 20px; display: none; text-align:center; line-height: 1.5; }
+  </style>
+</head>
+<body class="crt">
+  <div id="game-wrapper">
+    <div class="hud">
+      <a href="index.html" class="back-btn">◄ SYS.DIR</a>
+      <div class="score-board">
+        <div id="score">CYCLES: 000</div>
+        <div id="high-score">NODE: KERNEL</div>
+      </div>
+    </div>
+    <div id="game-area">
+      <canvas id="canvas" width="400" height="400"></canvas>
+      <div id="overlay">
+        <div id="overlay-msg">FATAL KERNEL ERROR</div>
+        <button class="action-btn" onclick="startGame()">INITIATE MODULE</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('overlay');
+    
+    let tasks = [];
+    let score = 0;
+    let cpuLoad = 0;
+    let gameActive = false;
+    let animationId;
+    let frameCount = 0;
+
+    canvas.addEventListener('mousedown', (e) => {
+      if(!gameActive) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      for(let t of tasks) {
+        if(x > t.x && x < t.x + t.w && y > t.y && y < t.y + t.h) {
+          t.active = !t.active;
+          break;
+        }
+      }
+    });
+
+    function formatScore(num) {
+      if (num < 10) return "00" + num;
+      if (num < 100) return "0" + num;
+      return num.toString();
+    }
+
+    function startGame() {
+      overlay.style.display = 'none';
+      tasks = [];
+      score = 0;
+      cpuLoad = 0;
+      frameCount = 0;
+      gameActive = true;
+      if(animationId) cancelAnimationFrame(animationId);
+      update();
+    }
+
+    function update() {
+      if(!gameActive) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      frameCount++;
+      
+      // Calculate current load
+      cpuLoad = 0;
+      tasks.forEach(t => { if(t.active) cpuLoad += t.load; });
+
+      // Check win/loss conditions
+      if(cpuLoad >= 100) {
+        triggerGameOver("CPU OVERLOAD 100%");
+        return;
+      }
+      
+      if(cpuLoad > 70 && frameCount % 10 === 0) {
+        score++;
+        document.getElementById('score').innerText = "CYCLES: " + formatScore(score);
+      }
+
+      // Spawn new tasks
+      let spawnRate = Math.max(60 - Math.floor(score/10), 20);
+      if(frameCount % spawnRate === 0 && tasks.length < 15) {
+        tasks.push({
+          x: Math.random() * 340 + 10,
+          y: Math.random() * 300 + 50,
+          w: 40, h: 40,
+          load: Math.floor(Math.random() * 25) + 5,
+          active: false,
+          life: 300 + Math.random() * 200
+        });
+      }
+
+      // Draw CPU Bar
+      ctx.fillStyle = '#333355';
+      ctx.fillRect(10, 10, 380, 20);
+      ctx.fillStyle = cpuLoad > 85 ? '#ff0055' : (cpuLoad > 70 ? '#00ffaa' : '#00d2ff');
+      ctx.fillRect(10, 10, (cpuLoad/100) * 380, 20);
+      ctx.fillStyle = '#fff';
+      ctx.font = '10px "Press Start 2P"';
+      ctx.fillText(`CPU: ${cpuLoad}%`, 15, 24);
+
+      // Draw and update tasks
+      for(let i = tasks.length - 1; i >= 0; i--) {
+        let t = tasks[i];
+        t.life--;
+        if(t.life <= 0) {
+          tasks.splice(i, 1);
+          continue;
+        }
+
+        ctx.strokeStyle = t.active ? '#00ffaa' : '#ff0055';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(t.x, t.y, t.w, t.h);
+        ctx.fillStyle = t.active ? 'rgba(0, 255, 170, 0.2)' : 'rgba(255, 0, 85, 0.2)';
+        ctx.fillRect(t.x, t.y, t.w, t.h);
+        
+        ctx.fillStyle = '#fff';
+        ctx.font = '10px "Press Start 2P"';
+        ctx.fillText(t.load + "%", t.x + 5, t.y + 25);
+      }
+
+      if(gameActive) animationId = requestAnimationFrame(update);
+    }
+
+    function triggerGameOver(msg) {
+      gameActive = false;
+      document.getElementById('overlay-msg').innerText = msg;
+      document.getElementById('overlay-msg').style.display = 'block';
+      document.querySelector('.action-btn').innerText = "REBOOT KERNEL";
+      overlay.style.display = 'flex';
+    }
+  </script>
+</body>
+</html>

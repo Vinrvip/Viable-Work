@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Viable Works - DECRYPT (Minecraft)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; user-select: none; }
+    body { background-color: #050508; color: #ffffff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
+    
+    .crt::before { content: " "; display: block; position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%); pointer-events: none; z-index: 100; }
+    
+    /* Widened wrapper to accommodate the 854px width + padding */
+    #game-wrapper { width: 902px; background: #080812; border: 4px solid #1a1a3a; box-shadow: 0 0 20px rgba(0, 210, 255, 0.2); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; align-items: center; z-index: 10; }
+    
+    .hud { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #00d2ff; padding-bottom: 10px; }
+    .back-btn { background: transparent; color: #ff0055; border: 2px solid #ff0055; padding: 8px 12px; font-size: 0.7rem; cursor: pointer; text-decoration: none; transition: 0.2s; }
+    .back-btn:hover { background: #ff0055; color: #000; box-shadow: 0 0 10px #ff0055; }
+    
+    .score-board { text-align: right; }
+    #score { color:#00d2ff; font-size:0.8rem; margin-bottom: 5px; }
+    #high-score { color:#8888aa; font-size:0.6rem; }
+    
+    /* 480p Widescreen Resolution */
+    #game-area { position: relative; width: 854px; height: 480px; border: 2px solid #333355; background: #050508; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); }
+    
+    iframe { width: 100%; height: 100%; border: none; display: block; }
+  </style>
+</head>
+<body class="crt">
+  <div id="game-wrapper">
+    <div class="hud">
+      <a href="index.html" class="back-btn">◄ SYS.DIRECTORY</a>
+      <div class="score-board">
+        <div id="score">STATUS: CONNECTED</div>
+        <div id="high-score">NODE: DECRYPT_MC</div>
+      </div>
+    </div>
+    
+    <div id="game-area">
+      <!-- Eaglercraft Embedded Frame -->
+      <iframe src="https://redflamz.github.io/Eaglercraft-Launcher/"></iframe>
+    </div>
+  </div>
+</body>
+</html>

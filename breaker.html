@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Viable Works - Module 04</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; user-select: none; }
+    body { background-color: #050508; color: #ffffff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .crt::before { content: " "; display: block; position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06)); z-index: 100; pointer-events: none; }
+    
+    #game-wrapper { width: 450px; background: #080812; border: 4px solid #1a1a3a; box-shadow: 0 0 20px rgba(0, 210, 255, 0.2); border-radius: 8px; padding: 20px; z-index: 10; display: flex; flex-direction: column; align-items: center; }
+    .hud { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #00d2ff; padding-bottom: 10px; }
+    .back-btn { background: transparent; color: #ff0055; border: 2px solid #ff0055; padding: 8px 12px; font-size: 0.7rem; cursor: pointer; text-decoration: none; }
+    .score { color: #00d2ff; font-size: 0.8rem; }
+    
+    #game-area { position: relative; width: 400px; height: 400px; cursor: none; }
+    canvas { border: 2px solid #333355; background: #050508; display: block; }
+    
+    /* Overlay */
+    #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 5, 8, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 20; border: 2px solid #333355; cursor: default; }
+    .action-btn { background: #111122; color: #00d2ff; border: 2px solid #00d2ff; padding: 15px 20px; font-size: 0.8rem; cursor: pointer; transition: 0.2s; }
+    .action-btn:hover { background: #00d2ff; color: #000; box-shadow: 0 0 15px #00d2ff; }
+    #overlay-msg { color: #ff0055; font-size: 0.8rem; margin-bottom: 20px; text-align: center; line-height: 1.5; display: none; }
+
+    .instructions { margin-top: 15px; font-size: 0.65rem; color: #8888aa; text-align: center; line-height: 1.4; }
+  </style>
+</head>
+<body class="crt">
+  <div id="game-wrapper">
+    <div class="hud">
+      <a href="index.html" class="back-btn">◄ SYS.DIRECTORY</a>
+      <div class="score" id="score-display">DATA: 000</div>
+    </div>
+    
+    <div id="game-area">
+      <canvas id="canvas" width="400" height="400"></canvas>
+      
+      <div id="overlay">
+        <div id="overlay-msg">SIGNAL LOST</div>
+        <button class="action-btn" id="action-btn" onclick="startGame()">INITIATE SEQUENCE</button>
+      </div>
+    </div>
+
+    <div class="instructions" id="status">MODULE 04: BREAKER<br>Use mouse to control the paddle. Destroy data blocks.</div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('overlay');
+    const overlayMsg = document.getElementById('overlay-msg');
+    const actionBtn = document.getElementById('action-btn');
+    
+    let paddle = {}, ball = {}, bricks = [], score = 0, loopId;
+
+    function setupGame() {
+      paddle = {x: 160, w: 80, h: 10};
+      ball = {x: 200, y: 300, vx: 4, vy: -4, r: 4};
+      bricks = [];
+      score = 0;
+      document.getElementById('score-display').innerText = `DATA: 000`;
+      
+      for(let r=0; r<5; r++) {
+        for(let c=0; c<7; c++) bricks.push({x: c*55 + 10, y: r*25 + 30, w: 50, h: 15, active: true});
+      }
+      draw();
+    }
+
+    canvas.addEventListener('mousemove', e => {
+      let rect = canvas.getBoundingClientRect();
+      paddle.x = e.clientX - rect.left - paddle.w/2;
+      if(paddle.x < 0) paddle.x = 0;
+      if(paddle.x + paddle.w > 400) paddle.x = 400 - paddle.w;
+    });
+
+    function startGame() {
+      overlay.style.display = 'none';
+      setupGame();
+      if(loopId) clearInterval(loopId);
+      loopId = setInterval(gameLoop, 1000/60);
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, 400, 400);
+      ctx.fillStyle = '#00d2ff'; ctx.fillRect(paddle.x, 380, paddle.w, paddle.h);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(ball.x-ball.r, ball.y-ball.r, ball.r*2, ball.r*2);
+      ctx.fillStyle = '#ff0055';
+      bricks.forEach(b => { if(b.active) ctx.fillRect(b.x, b.y, b.w, b.h); });
+    }
+
+    function gameLoop() {
+      ball.x += ball.vx; ball.y += ball.vy;
+      
+      if(ball.x <= 0 || ball.x >= 400) ball.vx *= -1;
+      if(ball.y <= 0) ball.vy *= -1;
+      
+      if(ball.y >= 400) {
+        clearInterval(loopId);
+        overlayMsg.style.display = 'block';
+        actionBtn.innerText = "REBOOT MODULE";
+        overlay.style.display = 'flex';
+        return;
+      }
+
+      if(ball.y + ball.r >= 380 && ball.x >= paddle.x && ball.x <= paddle.x + paddle.w) {
+        ball.vy = -Math.abs(ball.vy);
+        ball.vx = ((ball.x - (paddle.x + paddle.w/2)) / (paddle.w/2)) * 5; 
+      }
+
+      bricks.forEach(b => {
+        if(b.active && ball.x > b.x && ball.x < b.x + b.w && ball.y > b.y && ball.y < b.y + b.h) {
+          b.active = false;
+          ball.vy *= -1;
+          score += 10;
+          document.getElementById('score-display').innerText = `DATA: ${score.toString().padStart(3, '0')}`;
+        }
+      });
+
+      draw();
+    }
+    
+    setupGame();
+  </script>
+</body>
+</html>

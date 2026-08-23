@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Viable Works - Module 08</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; user-select: none; }
+    body { background-color: #050508; color: #ffffff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .crt::before { content: " "; display: block; position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%); pointer-events: none; z-index: 100; }
+    #game-wrapper { width: 450px; background: #080812; border: 4px solid #1a1a3a; box-shadow: 0 0 20px rgba(0, 210, 255, 0.2); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; align-items: center; z-index: 10; }
+    .hud { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #00d2ff; padding-bottom: 10px; }
+    .back-btn { background: transparent; color: #ff0055; border: 2px solid #ff0055; padding: 8px 12px; font-size: 0.7rem; cursor: pointer; text-decoration: none; }
+    #game-area { position: relative; width: 400px; height: 400px; }
+    #grid { display: grid; grid-template-columns: repeat(10, 1fr); width: 100%; height: 100%; gap: 2px; background: #333355; border: 2px solid #111122; }
+    .cell { background: #111122; border: 2px outset #333355; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; cursor: pointer; color: #00d2ff; }
+    .cell.open { background: #080812; border: 1px solid #1a1a3a; }
+    .cell.mine { background: #ff0055; color: #fff; }
+    #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 5, 8, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 20; border: 2px solid #333355; }
+    .action-btn { background: #111122; color: #00d2ff; border: 2px solid #00d2ff; padding: 15px 20px; font-size: 0.8rem; cursor: pointer; }
+    #overlay-msg { color: #ff0055; font-size: 0.8rem; margin-bottom: 20px; display: none; }
+  </style>
+</head>
+<body class="crt">
+  <div id="game-wrapper">
+    <div class="hud"><a href="index.html" class="back-btn">◄ SYS.DIRECTORY</a></div>
+    <div id="game-area">
+      <div id="grid"></div>
+      <div id="overlay">
+        <div id="overlay-msg">FATAL ERROR</div>
+        <button class="action-btn" onclick="startGame()">INITIATE SCAN</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    const gridEl = document.getElementById('grid'), overlay = document.getElementById('overlay'), msg = document.getElementById('overlay-msg');
+    let cells = [], mines = [], gameActive = false, size = 10, mineCount = 15;
+
+    function startGame() {
+      overlay.style.display = 'none'; gridEl.innerHTML = ''; cells = []; gameActive = true;
+      mines = Array(size*size).fill(false).map((_, i) => i < mineCount).sort(() => Math.random() - 0.5);
+      
+      for(let i=0; i<size*size; i++) {
+        let cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.onclick = () => clickCell(i);
+        gridEl.appendChild(cell);
+        cells.push({ el: cell, mine: mines[i], open: false });
+      }
+    }
+
+    function countMines(i) {
+      let r = Math.floor(i/size), c = i%size, count = 0;
+      for(let dr=-1; dr<=1; dr++) for(let dc=-1; dc<=1; dc++) {
+        let nr = r+dr, nc = c+dc;
+        if(nr>=0 && nr<size && nc>=0 && nc<size && cells[nr*size+nc].mine) count++;
+      }
+      return count;
+    }
+
+    function clickCell(i) {
+      if(!gameActive || cells[i].open) return;
+      cells[i].open = true;
+      cells[i].el.classList.add('open');
+      
+      if(cells[i].mine) {
+        cells[i].el.classList.add('mine');
+        cells[i].el.innerText = 'X';
+        endGame(false);
+      } else {
+        let count = countMines(i);
+        if(count > 0) cells[i].el.innerText = count;
+        else {
+          let r = Math.floor(i/size), c = i%size;
+          for(let dr=-1; dr<=1; dr++) for(let dc=-1; dc<=1; dc++) {
+            let nr = r+dr, nc = c+dc;
+            if(nr>=0 && nr<size && nc>=0 && nc<size) clickCell(nr*size+nc);
+          }
+        }
+        if(cells.filter(c => !c.open).length === mineCount) endGame(true);
+      }
+    }
+
+    function endGame(win) {
+      gameActive = false;
+      cells.forEach(c => { if(c.mine) { c.el.classList.add('mine'); c.el.innerText = 'X'; }});
+      msg.innerText = win ? "GRID SECURED" : "FATAL ERROR";
+      msg.style.color = win ? "#00d2ff" : "#ff0055";
+      msg.style.display = 'block';
+      document.querySelector('.action-btn').innerText = "REBOOT";
+      overlay.style.display = 'flex';
+    }
+  </script>
+</body>
+</html>

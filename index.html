@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Viable Works - Master Terminal</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; user-select: none; }
+    html { scrollbar-width: thin; scrollbar-color: #1a1a3a #050508; }
+    body { 
+      background-color: #050508; 
+      color: #ffffff; 
+      min-height: 100vh; 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      justify-content: center;
+      padding: 12px; 
+      overflow-x: hidden; 
+      position: relative; 
+    }
+
+    /* Animated background grid */
+    .bg-grid {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(0, 210, 255, 0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 210, 255, 0.07) 1px, transparent 1px);
+      background-size: 50px 50px;
+      animation: gridDrift 14s linear infinite;
+      mask-image: radial-gradient(ellipse 90% 70% at 50% 50%, #000 50%, transparent 95%);
+      -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 50%, #000 50%, transparent 95%);
+    }
+    @keyframes gridDrift { 0% { background-position: 0 0, 0 0; } 100% { background-position: 50px 50px, 50px 50px; } }
+    .bg-vignette {
+      position: fixed; inset: 0; z-index: 1; pointer-events: none;
+      background: radial-gradient(ellipse at center, rgba(5,5,8,0) 40%, rgba(5,5,8,0.9) 100%);
+    }
+
+    /* CRT & Scanline Overlays */
+    .crt::before {
+      content: " "; display: block; position: fixed; top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+      z-index: 100; background-size: 100% 3px, 6px 100%; pointer-events: none;
+    }
+    .crt-flicker::after {
+      content: " "; display: block; position: fixed; inset: 0; z-index: 101; pointer-events: none;
+      background: rgba(255,255,255,0.02); animation: flicker 6.5s infinite;
+    }
+    @keyframes flicker {
+      0%, 96%, 100% { opacity: 0; }
+      97% { opacity: 1; }
+      98% { opacity: 0; }
+      99% { opacity: 0.6; }
+    }
+    .scanline {
+      width: 100%; height: 15px; background: rgba(0, 210, 255, 0.05);
+      position: fixed; top: 0; left: 0; z-index: 105; pointer-events: none;
+      animation: scanline 8s linear infinite;
+    }
+    @keyframes scanline {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(100vh); }
+    }
+
+    /* Boot Sequence Overlay */
+    #boot-sequence {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: #050508; z-index: 200;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      transition: opacity 0.8s ease-out;
+    }
+    #boot-text {
+      color: #00d2ff; font-size: 1.1rem; text-align: left; width: 92%; max-width: 900px;
+      line-height: 1.8; text-shadow: 0 0 5px #00d2ff; height: 320px; overflow-y: hidden;
+    }
+    .cursor {
+      display: inline-block; width: 12px; height: 1.1rem; background-color: #00d2ff;
+      animation: blink 1s step-end infinite; vertical-align: bottom; margin-left: 5px;
+    }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    .ok-tag { color: #00ff88; }
+    #boot-progress-wrap {
+      width: 92%; max-width: 900px; height: 8px; background: #111122; border: 1px solid #1a1a3a; margin-top: 15px;
+    }
+    #boot-progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #00d2ff, #ff0055); transition: width 0.15s linear; }
+
+    /* Expanded Main Terminal Wrapper */
+    #wrapper {
+      width: 98vw;
+      min-height: 95vh;
+      background: #080812; 
+      border: 4px solid #1a1a3a;
+      box-shadow: 0 0 35px rgba(0, 210, 255, 0.25), inset 0 0 25px rgba(255, 0, 85, 0.12);
+      border-radius: 10px; 
+      padding: 28px 32px; 
+      position: relative; 
+      z-index: 10;
+      opacity: 0;
+      transition: opacity 1s ease-in;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    #wrapper::after {
+      content: ""; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(0,210,255,0.06), transparent);
+      animation: sweep 9s ease-in-out infinite; pointer-events: none;
+    }
+    @keyframes sweep { 0% { left: -60%; } 45% { left: 130%; } 100% { left: 130%; } }
+
+    header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #00d2ff; padding-bottom: 16px; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
+    .brand { color: #ff0055; font-size: 1.8rem; text-shadow: 3px 3px 0 #00d2ff; letter-spacing: 3px; }
+    .header-right { display: flex; align-items: center; gap: 18px; }
+    .status { color: #00d2ff; font-size: 0.85rem; letter-spacing: 1px; }
+    #clock { color: #8888aa; font-size: 0.8rem; letter-spacing: 1.5px; }
+    #sfx-toggle {
+      background: #111122; border: 2px solid #00d2ff; color: #00d2ff; font-family: inherit;
+      font-size: 0.7rem; padding: 8px 12px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+      transition: 0.2s;
+    }
+    #sfx-toggle:hover { background: #00d2ff; color: #050508; }
+    #sfx-toggle svg { width: 14px; height: 14px; }
+
+    /* Wide-Screen Flexible Grid */
+    #menu { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+      gap: 16px; 
+      position: relative; 
+      z-index: 2; 
+      flex-grow: 1;
+      align-content: start;
+    }
+
+    .module-link {
+      background: #111122; border: 2px solid #222244; padding: 16px; border-radius: 6px;
+      text-decoration: none; display: flex; flex-direction: column; justify-content: space-between; transition: 0.2s; text-align: left;
+      position: relative; overflow: hidden; min-height: 135px;
+    }
+    .module-link::before {
+      content: ""; position: absolute; top: 0; left: 0; width: 4px; height: 100%;
+      background: #00d2ff; transform: scaleY(0); transform-origin: bottom; transition: transform 0.25s;
+    }
+    .module-link:hover::before { transform: scaleY(1); }
+    .module-link:hover {
+      border-color: #00ffff; background: #1a1a33; transform: translateY(-3px);
+      box-shadow: 0 6px 18px rgba(0, 255, 255, 0.2);
+    }
+    .module-link.launching { animation: launchPulse 0.35s ease-out; }
+    @keyframes launchPulse { 0% { box-shadow: 0 0 0 rgba(0,255,255,0); } 50% { box-shadow: 0 0 30px rgba(0,255,255,0.6); } 100% { box-shadow: 0 0 0 rgba(0,255,255,0); } }
+
+    .mod-num-bg {
+      position: absolute; top: -10px; right: 4px; font-size: 2.8rem; color: rgba(255,255,255,0.04);
+      line-height: 1; pointer-events: none;
+    }
+    .mod-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; position: relative; }
+    .module-icon { width: 24px; height: 24px; color: #00d2ff; flex-shrink: 0; filter: drop-shadow(0 0 4px rgba(0,210,255,0.6)); }
+
+    .module-link h2 {
+      color: #fff; font-size: 0.85rem; margin-bottom: 0; line-height: 1.3;
+      position: relative;
+    }
+
+    .module-link:hover h2 {
+      animation: chromatic-glitch 0.6s infinite;
+    }
+
+    .module-link p { color: #8888aa; font-size: 0.65rem; line-height: 1.45; margin-bottom: 12px; flex-grow: 1; }
+    .module-link span.status-tag { color: #00d2ff; font-size: 0.58rem; display: inline-block; padding: 4px 8px; border: 1px solid #00d2ff; align-self: flex-start; position: relative; }
+    .module-link span.status-tag::before {
+      content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #00ff88;
+      margin-right: 6px; box-shadow: 0 0 6px #00ff88; animation: pulseDot 1.4s ease-in-out infinite;
+    }
+    @keyframes pulseDot { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+    @keyframes chromatic-glitch {
+      0% { text-shadow: 2px 0 0 #00ffff, -2px 0 0 #ff0000; }
+      25% { text-shadow: -2px 1px 0 #00ffff, 2px -1px 0 #ff0000; }
+      50% { text-shadow: 2px -1px 0 #00ffff, -2px 1px 0 #ff0000; }
+      75% { text-shadow: -2px 0 0 #00ffff, 2px 0 0 #ff0000; }
+      100% { text-shadow: 2px 0 0 #00ffff, -2px 0 0 #ff0000; }
+    }
+
+    footer { margin-top: 20px; text-align: center; color: #444466; font-size: 0.62rem; letter-spacing: 1.5px; position: relative; z-index: 2; border-top: 1px solid #111122; padding-top: 12px; }
+  </style>
+</head>
+<body class="crt crt-flicker">
+  <div class="bg-grid"></div>
+  <div class="bg-vignette"></div>
+  <div class="scanline"></div>
+
+  <!-- Boot Sequence Overlay -->
+  <div id="boot-sequence">
+    <div id="boot-text"></div>
+    <div id="boot-progress-wrap"><div id="boot-progress-bar"></div></div>
+  </div>
+
+  <!-- Main Menu -->
+  <div id="wrapper">
+    <header>
+      <div class="brand">VIABLE WORKS</div>
+      <div class="header-right">
+        <div id="clock">00:00:00</div>
+        <button id="sfx-toggle" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path id="sfx-wave" d="M16 8a5 5 0 0 1 0 8"/></svg>
+          <span id="sfx-label">SFX:ON</span>
+        </button>
+        <div class="status">SYS.DIRECTORY</div>
+      </div>
+    </header>
+
+    <div id="menu">
+      <a href="slide.html" class="module-link" data-idx="01">
+        <span class="mod-num-bg">01</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="3" width="4" height="18"/></svg>
+          <h2>DATA SLIDE</h2>
+        </div>
+        <p>Reconstruct the fragmented data sequence into numerical order.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="snake.html" class="module-link" data-idx="02">
+        <span class="mod-num-bg">02</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17h4a3 3 0 0 0 3-3V8a3 3 0 0 1 3-3h8"/><circle cx="19" cy="5" r="1.5" fill="currentColor"/></svg>
+          <h2>SNAKE CORE</h2>
+        </div>
+        <p>Grid traversal engine. Expand memory footprint without critical collision.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="lights.html" class="module-link" data-idx="03">
+        <span class="mod-num-bg">03</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          <h2>LIGHTS OUT</h2>
+        </div>
+        <p>Logic cascade puzzle. Darken the grid to restore system power.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="breaker.html" class="module-link" data-idx="04">
+        <span class="mod-num-bg">04</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="19" width="8" height="2.5"/><circle cx="15" cy="9" r="2"/><path d="M4 3h16v10H4z"/></svg>
+          <h2>BREAKER</h2>
+        </div>
+        <p>Kinetic deflection. Destroy external data blocks using the paddle.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="sequence.html" class="module-link" data-idx="05">
+        <span class="mod-num-bg">05</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="2.4" fill="currentColor"/><circle cx="12" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/><circle cx="19" cy="12" r="2.4"/></svg>
+          <h2>SEQUENCE</h2>
+        </div>
+        <p>Pattern recognition. Memorize and replicate the terminal flashes perfectly.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="tictactoe.html" class="module-link" data-idx="06">
+        <span class="mod-num-bg">06</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v18M16 3v18M3 8h18M3 16h18"/></svg>
+          <h2>ZERO-SUM</h2>
+        </div>
+        <p>Defeat the Minimax logic engine. Tie states will force a reboot.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="pong.html" class="module-link" data-idx="07">
+        <span class="mod-num-bg">07</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="8" width="2" height="8"/><rect x="20" y="8" width="2" height="8"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg>
+          <h2>PING</h2>
+        </div>
+        <p>Deflect the data packet against the tracking subroutine.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="connect.html" class="module-link" data-idx="08">
+        <span class="mod-num-bg">08</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+          <h2>TRACKER</h2>
+        </div>
+        <p>Precision calibration. Intercept nodes before they collapse.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="mines.html" class="module-link" data-idx="09">
+        <span class="mod-num-bg">09</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>
+          <h2>REACTION</h2>
+        </div>
+        <p>Nerve conduction test. Execute command on green signal.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="minecraft.html" class="module-link" data-idx="10">
+        <span class="mod-num-bg">10</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="10" width="14" height="11" rx="1"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          <h2>FREE WORLD</h2>
+        </div>
+        <p>Explore a virtual world with logic built inside and throughout the entire world.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="evasion.html" class="module-link" data-idx="11">
+        <span class="mod-num-bg">11</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4"/><circle cx="12" cy="17" r="0.8" fill="currentColor"/></svg>
+          <h2>EVASION</h2>
+        </div>
+        <p>Avoid incoming firewall debris. Speed increases over time.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="overdrive.html" class="module-link" data-idx="12">
+        <span class="mod-num-bg">12</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/></svg>
+          <h2>OVERDRIVE</h2>
+        </div>
+        <p>High-speed telemetry track. Maintain the neon route against 4 AI subroutines.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="syntax.html" class="module-link" data-idx="13">
+        <span class="mod-num-bg">13</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h2M16 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-2"/></svg>
+          <h2>SYNTAX SHIELD</h2>
+        </div>
+        <p>Type the corresponding character to destroy falling pseudo-code fragments.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="signal.html" class="module-link" data-idx="14">
+        <span class="mod-num-bg">14</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M3 9h18M9 21V9"/></svg>
+          <h2>SIGNAL JAMMER</h2>
+        </div>
+        <p>Tactical frequency sweep. Intercept and block hostile transmissions.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="gateway.html" class="module-link" data-idx="15">
+        <span class="mod-num-bg">15</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <h2>LOGIC GATEWAY</h2>
+        </div>
+        <p>Calibrate receiver polarity [0] or [1] to match incoming binary packets.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="trace.html" class="module-link" data-idx="16">
+        <span class="mod-num-bg">16</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <h2>TRACE ROUTE</h2>
+        </div>
+        <p>Vertical evasion. Navigate your packet safely through network gaps.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="ring.html" class="module-link" data-idx="17">
+        <span class="mod-num-bg">17</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+          <h2>GRID PURGE</h2>
+        </div>
+        <p>Dodge targeted sector purges across the matrix grid as difficulty scales.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="loop.html" class="module-link" data-idx="18">
+        <span class="mod-num-bg">18</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+          <h2>DATA LOOP</h2>
+        </div>
+        <p>Orbital survival. Switch orbital rings to collect data and avoid corruption.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+      <a href="zeroday.html" class="module-link" data-idx="19">
+        <span class="mod-num-bg">19</span>
+        <div class="mod-head">
+          <svg class="module-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <h2>ZERO DAY</h2>
+        </div>
+        <p>Terminal defense protocol. Eliminate exploits before they breach the core.</p>
+        <span class="status-tag">MODULE.READY</span>
+      </a>
+    </div>
+
+    <footer>VIABLE WORKS TERMINAL &middot; 19 MODULES ONLINE &middot; UPLINK STABLE</footer>
+  </div>
+
+  <script>
+    /* ============================== AUDIO ============================== */
+    const AudioSys = {
+      ctx: null, master: null, ambientOsc: null, ambientGain: null, ambientLfo: null, muted: false,
+      init() {
+        if (this.ctx) return;
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        this.ctx = new AC();
+        this.master = this.ctx.createGain();
+        this.master.gain.value = this.muted ? 0 : 0.5;
+        this.master.connect(this.ctx.destination);
+      },
+      resume() { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
+      blip(freq, dur, type, vol) {
+        if (!this.ctx) return;
+        const o = this.ctx.createOscillator(); o.type = type || 'square';
+        const g = this.ctx.createGain(); g.gain.value = vol || 0.2;
+        o.frequency.value = freq;
+        o.connect(g); g.connect(this.master);
+        const t = this.ctx.currentTime;
+        g.gain.setValueAtTime(g.gain.value, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        o.start(t); o.stop(t + dur + 0.02);
+      },
+      tick() { this.blip(1600 + Math.random() * 300, 0.02, 'square', 0.05); },
+      hover() { this.blip(900, 0.05, 'sine', 0.08); },
+      click() {
+        this.blip(1200, 0.06, 'square', 0.14);
+        setTimeout(() => this.blip(700, 0.09, 'square', 0.12), 60);
+      },
+      toggle() { this.blip(500, 0.05, 'triangle', 0.15); },
+      bootComplete() {
+        [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => this.blip(f, 0.28, 'triangle', 0.16), i * 90));
+      },
+      startAmbient() {
+        if (!this.ctx || this.ambientOsc) return;
+        const o = this.ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 55;
+        const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 220;
+        const g = this.ctx.createGain(); g.gain.value = 0.025;
+        const lfo = this.ctx.createOscillator(); lfo.frequency.value = 0.08;
+        const lfoGain = this.ctx.createGain(); lfoGain.gain.value = 40;
+        lfo.connect(lfoGain); lfoGain.connect(f.frequency);
+        o.connect(f); f.connect(g); g.connect(this.master);
+        o.start(); lfo.start();
+        this.ambientOsc = o; this.ambientLfo = lfo; this.ambientGain = g;
+      },
+      setMuted(m) {
+        this.muted = m;
+        if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.5, this.ctx.currentTime, 0.05);
+      }
+    };
+
+    try { AudioSys.muted = localStorage.getItem('vw_sfx_muted') === 'true'; } catch (e) {}
+
+    const sfxToggle = document.getElementById('sfx-toggle');
+    const sfxLabel = document.getElementById('sfx-label');
+    function refreshSfxLabel() { sfxLabel.textContent = AudioSys.muted ? 'SFX:OFF' : 'SFX:ON'; }
+    refreshSfxLabel();
+    sfxToggle.addEventListener('click', () => {
+      AudioSys.init(); AudioSys.resume();
+      AudioSys.setMuted(!AudioSys.muted);
+      refreshSfxLabel();
+      if (!AudioSys.muted) AudioSys.toggle();
+      try { localStorage.setItem('vw_sfx_muted', String(AudioSys.muted)); } catch (e) {}
+    });
+
+    function primeAudioOnce() {
+      AudioSys.init(); AudioSys.resume(); AudioSys.startAmbient();
+      window.removeEventListener('pointerdown', primeAudioOnce);
+      window.removeEventListener('keydown', primeAudioOnce);
+    }
+    window.addEventListener('pointerdown', primeAudioOnce, { once: true });
+    window.addEventListener('keydown', primeAudioOnce, { once: true });
+    AudioSys.init(); AudioSys.resume(); AudioSys.startAmbient();
+
+    /* ============================== CLOCK ============================== */
+    function tickClock() {
+      const d = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      document.getElementById('clock').textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+    tickClock();
+    setInterval(tickClock, 1000);
+
+    /* ============================== MODULE LINKS ============================== */
+    document.querySelectorAll('.module-link').forEach(link => {
+      link.addEventListener('mouseenter', () => AudioSys.hover());
+      link.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (this.classList.contains('launching')) return;
+        AudioSys.click();
+        this.classList.add('launching');
+        const href = this.getAttribute('href');
+        if (href !== "#") {
+            setTimeout(() => { window.location.href = href; }, 220);
+        } else {
+            setTimeout(() => { this.classList.remove('launching'); }, 220);
+        }
+      });
+    });
+
+    /* ============================== BOOT SEQUENCE ============================== */
+    const bootTextDiv = document.getElementById('boot-text');
+    const bootOverlay = document.getElementById('boot-sequence');
+    const wrapper = document.getElementById('wrapper');
+    const bootBar = document.getElementById('boot-progress-bar');
+
+    let bootSequence = [];
+
+    for (let i = 0; i < 20; i++) {
+      let hex = Math.floor(Math.random() * 16777215).toString(16).toUpperCase().padStart(6, '0');
+      let ms = (Math.random() * 2).toFixed(3);
+      bootSequence.push(`[${ms}] KERNEL_MEM_CHECK: 0x${hex} ... <span class="ok-tag">VERIFIED</span>`);
+    }
+
+    bootSequence.push("--------------------------------------");
+    bootSequence.push('MOUNTING VIRTUAL FILESYSTEM... <span class="ok-tag">[OK]</span>');
+    bootSequence.push('BYPASSING SECURITY PROTOCOLS... <span class="ok-tag">[OK]</span>');
+    bootSequence.push('DECRYPTING DATA CORE... <span class="ok-tag">[OK]</span>');
+    bootSequence.push(" ");
+    bootSequence.push("ACCESS GRANTED. WELCOME.");
+
+    let currentLine = 0;
+    const totalLines = bootSequence.length;
+
+    function typeLine() {
+      if (currentLine < bootSequence.length) {
+        const lineP = document.createElement('div');
+        lineP.innerHTML = bootSequence[currentLine] + '<span class="cursor"></span>';
+
+        if (bootTextDiv.lastChild) {
+          const oldCursor = bootTextDiv.lastChild.querySelector('.cursor');
+          if (oldCursor) oldCursor.remove();
+        }
+
+        bootTextDiv.appendChild(lineP);
+        bootTextDiv.scrollTop = bootTextDiv.scrollHeight;
+        bootBar.style.width = Math.round(((currentLine + 1) / totalLines) * 100) + '%';
+        AudioSys.tick();
+
+        let delay = currentLine < 20 ? 30 : (Math.random() * 200 + 300);
+        currentLine++;
+        setTimeout(typeLine, delay);
+      } else {
+        AudioSys.bootComplete();
+        setTimeout(() => {
+          bootOverlay.style.opacity = '0';
+          wrapper.style.opacity = '1';
+          setTimeout(() => bootOverlay.style.display = 'none', 800);
+        }, 1200);
+      }
+    }
+
+    window.onload = () => setTimeout(typeLine, 300);
+  </script>
+</body>
+</html>

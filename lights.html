@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Viable Works - Module 03</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; user-select: none; }
+    body { background-color: #050508; color: #ffffff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .crt::before { content: " "; display: block; position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06)); z-index: 100; pointer-events: none; }
+    
+    #game-wrapper { width: 450px; max-width: 95vw; background: #080812; border: 4px solid #1a1a3a; box-shadow: 0 0 20px rgba(0, 210, 255, 0.2); border-radius: 8px; padding: 20px; z-index: 10; display: flex; flex-direction: column; align-items: center; }
+    .hud { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #00d2ff; padding-bottom: 10px; }
+    .back-btn { background: transparent; color: #ff0055; border: 2px solid #ff0055; padding: 8px 12px; font-size: 0.7rem; cursor: pointer; text-decoration: none; }
+    .back-btn:hover { background: #ff0055; color: #000; }
+    .score { color: #00d2ff; font-size: 0.8rem; }
+    
+    #game-area { position: relative; width: 400px; height: 400px; }
+    #board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; background: #333355; padding: 4px; border: 2px solid #111122; width: 100%; height: 100%; }
+    .node { background: #111122; border: 1px solid #222244; cursor: pointer; transition: 0.1s; }
+    .node.lit { background: #00d2ff; box-shadow: 0 0 10px #00d2ff; }
+
+    /* Overlay */
+    #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 5, 8, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 20; border: 2px solid #333355; }
+    .action-btn { background: #111122; color: #00d2ff; border: 2px solid #00d2ff; padding: 15px 20px; font-size: 0.8rem; cursor: pointer; transition: 0.2s; }
+    .action-btn:hover { background: #00d2ff; color: #000; box-shadow: 0 0 15px #00d2ff; }
+    #overlay-msg { color: #00d2ff; font-size: 0.8rem; margin-bottom: 20px; text-align: center; line-height: 1.5; display: none; }
+
+    .instructions { margin-top: 15px; font-size: 0.65rem; color: #8888aa; text-align: center; line-height: 1.4; }
+  </style>
+</head>
+<body class="crt">
+  <div id="game-wrapper">
+    <div class="hud">
+      <a href="index.html" class="back-btn">◄ SYS.DIRECTORY</a>
+      <div class="score" id="move-counter">MOVES: 00</div>
+    </div>
+    
+    <div id="game-area">
+      <div id="board"></div>
+      
+      <div id="overlay">
+        <div id="overlay-msg">POWER GRID SECURED</div>
+        <button class="action-btn" id="action-btn" onclick="startGame()">INITIATE SEQUENCE</button>
+      </div>
+    </div>
+
+    <div class="instructions" id="status-text">MODULE 03: LIGHTS OUT<br>Click nodes to toggle states. Darken the grid.</div>
+  </div>
+
+  <script>
+    const board = document.getElementById('board');
+    const overlay = document.getElementById('overlay');
+    const overlayMsg = document.getElementById('overlay-msg');
+    const actionBtn = document.getElementById('action-btn');
+    
+    let moves = 0, size = 5;
+    let grid = [];
+    let gameActive = false;
+
+    function setupGame() {
+      grid = Array(size).fill().map(() => Array(size).fill(false));
+      moves = 0;
+      document.getElementById('move-counter').innerText = `MOVES: 00`;
+      for(let i=0; i<15; i++) toggleNode(Math.floor(Math.random()*size), Math.floor(Math.random()*size), false);
+      render();
+    }
+
+    function startGame() {
+      overlay.style.display = 'none';
+      setupGame();
+      gameActive = true;
+    }
+
+    function toggleNode(r, c, countMove = true) {
+      if(countMove && !gameActive) return;
+      
+      const toggle = (row, col) => { if(row>=0 && row<size && col>=0 && col<size) grid[row][col] = !grid[row][col]; };
+      toggle(r, c); toggle(r-1, c); toggle(r+1, c); toggle(r, c-1); toggle(r, c+1);
+      
+      if(countMove) {
+        moves++;
+        document.getElementById('move-counter').innerText = `MOVES: ${moves.toString().padStart(2, '0')}`;
+        render();
+        checkWin();
+      }
+    }
+
+    function render() {
+      board.innerHTML = '';
+      for(let r=0; r<size; r++) {
+        for(let c=0; c<size; c++) {
+          let node = document.createElement('div');
+          node.className = grid[r][c] ? 'node lit' : 'node';
+          node.onclick = () => toggleNode(r, c);
+          board.appendChild(node);
+        }
+      }
+    }
+
+    function checkWin() {
+      if(grid.every(row => row.every(val => !val))) {
+        gameActive = false;
+        overlayMsg.style.display = 'block';
+        actionBtn.innerText = "REBOOT MODULE";
+        overlay.style.display = 'flex';
+      }
+    }
+    
+    setupGame();
+  </script>
+</body>
+</html>

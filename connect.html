@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Viable Works - Module 10</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; user-select: none; }
+    body { background-color: #050508; color: #ffffff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .crt::before { content: " "; display: block; position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%); pointer-events: none; z-index: 100; }
+    #game-wrapper { width: 500px; background: #080812; border: 4px solid #1a1a3a; box-shadow: 0 0 20px rgba(0, 210, 255, 0.2); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; align-items: center; z-index: 10; }
+    .hud { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #00d2ff; padding-bottom: 10px; }
+    .back-btn { background: transparent; color: #ff0055; border: 2px solid #ff0055; padding: 8px 12px; font-size: 0.7rem; cursor: pointer; text-decoration: none; }
+    #game-area { position: relative; width: 440px; height: 380px; }
+    #board { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; background: #111122; padding: 10px; border: 2px solid #333355; height: 100%; }
+    .slot { background: #050508; border-radius: 50%; cursor: pointer; border: 2px inset #1a1a3a; }
+    .slot.p1 { background: #00d2ff; box-shadow: 0 0 10px #00d2ff; border:none; }
+    .slot.p2 { background: #ff0055; box-shadow: 0 0 10px #ff0055; border:none; }
+    #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 5, 8, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 20; border: 2px solid #333355; }
+    .action-btn { background: #111122; color: #00d2ff; border: 2px solid #00d2ff; padding: 15px 20px; font-size: 0.8rem; cursor: pointer; }
+    #overlay-msg { color: #00d2ff; font-size: 0.8rem; margin-bottom: 20px; display: none; text-align:center; }
+  </style>
+</head>
+<body class="crt">
+  <div id="game-wrapper">
+    <div class="hud">
+      <a href="index.html" class="back-btn">◄ SYS.DIRECTORY</a>
+      <div id="turn-indicator" style="color:#00d2ff; font-size:0.8rem;">TURN: BLUE</div>
+    </div>
+    <div id="game-area">
+      <div id="board"></div>
+      <div id="overlay">
+        <div id="overlay-msg"></div>
+        <button class="action-btn" onclick="startGame()">INITIATE LINK</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    const boardEl = document.getElementById('board'), overlay = document.getElementById('overlay'), msg = document.getElementById('overlay-msg');
+    let grid = [], currentPlayer = 1, gameActive = false;
+
+    function startGame() {
+      overlay.style.display = 'none'; gameActive = true; currentPlayer = 1; grid = Array(6).fill().map(() => Array(7).fill(0));
+      document.getElementById('turn-indicator').innerText = "TURN: BLUE"; document.getElementById('turn-indicator').style.color = "#00d2ff";
+      render();
+    }
+
+    function dropPiece(col) {
+      if(!gameActive) return;
+      for(let r=5; r>=0; r--) {
+        if(grid[r][col] === 0) {
+          grid[r][col] = currentPlayer; render();
+          if(checkWin(r, col)) {
+            gameActive = false; msg.innerText = currentPlayer === 1 ? "BLUE WINS" : "RED WINS";
+            msg.style.color = currentPlayer === 1 ? "#00d2ff" : "#ff0055";
+            msg.style.display = 'block'; document.querySelector('.action-btn').innerText = "REBOOT"; overlay.style.display = 'flex';
+          } else {
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            document.getElementById('turn-indicator').innerText = currentPlayer === 1 ? "TURN: BLUE" : "TURN: RED";
+            document.getElementById('turn-indicator').style.color = currentPlayer === 1 ? "#00d2ff" : "#ff0055";
+          }
+          return;
+        }
+      }
+    }
+
+    function render() {
+      boardEl.innerHTML = '';
+      for(let r=0; r<6; r++) for(let c=0; c<7; c++) {
+        let slot = document.createElement('div');
+        slot.className = `slot ${grid[r][c] === 1 ? 'p1' : grid[r][c] === 2 ? 'p2' : ''}`;
+        slot.onclick = () => dropPiece(c);
+        boardEl.appendChild(slot);
+      }
+    }
+
+    function checkWin(r, c) {
+      const dirs = [[0,1], [1,0], [1,1], [1,-1]];
+      for(let [dr, dc] of dirs) {
+        let count = 1;
+        for(let i=1; i<=3; i++) { let nr = r+dr*i, nc = c+dc*i; if(nr>=0 && nr<6 && nc>=0 && nc<7 && grid[nr][nc] === currentPlayer) count++; else break; }
+        for(let i=1; i<=3; i++) { let nr = r-dr*i, nc = c-dc*i; if(nr>=0 && nr<6 && nc>=0 && nc<7 && grid[nr][nc] === currentPlayer) count++; else break; }
+        if(count >= 4) return true;
+      }
+      return false;
+    }
+  </script>
+</body>
+</html>

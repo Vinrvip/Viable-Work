@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Viable Works - Module 07</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; user-select: none; }
+    body { background-color: #050508; color: #ffffff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .crt::before { content: " "; display: block; position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06)); z-index: 100; pointer-events: none; }
+    #game-wrapper { width: 450px; background: #080812; border: 4px solid #1a1a3a; box-shadow: 0 0 20px rgba(0, 210, 255, 0.2); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; align-items: center; z-index: 10; }
+    .hud { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #00d2ff; padding-bottom: 10px; }
+    .back-btn { background: transparent; color: #ff0055; border: 2px solid #ff0055; padding: 8px 12px; font-size: 0.7rem; cursor: pointer; text-decoration: none; }
+    .score { color: #00d2ff; font-size: 0.8rem; }
+    #game-area { position: relative; cursor: none; }
+    canvas { border: 2px solid #333355; background: #050508; display: block; }
+    #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 5, 8, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 20; border: 2px solid #333355; cursor: default;}
+    .action-btn { background: #111122; color: #00d2ff; border: 2px solid #00d2ff; padding: 15px 20px; font-size: 0.8rem; cursor: pointer; transition: 0.2s; }
+    .action-btn:hover { background: #00d2ff; color: #000; box-shadow: 0 0 15px #00d2ff; }
+    #overlay-msg { color: #ff0055; font-size: 0.8rem; margin-bottom: 20px; text-align: center; display: none; }
+    .instructions { margin-top: 15px; font-size: 0.65rem; color: #8888aa; text-align: center; line-height: 1.4; }
+  </style>
+</head>
+<body class="crt">
+  <div id="game-wrapper">
+    <div class="hud">
+      <a href="index.html" class="back-btn">◄ SYS.DIRECTORY</a>
+      <div class="score" id="score">YOU: 0 | CPU: 0</div>
+    </div>
+    <div id="game-area">
+      <canvas id="canvas" width="400" height="300"></canvas>
+      <div id="overlay">
+        <div id="overlay-msg"></div>
+        <button class="action-btn" id="action-btn" onclick="startGame()">INITIATE MATCH</button>
+      </div>
+    </div>
+    <div class="instructions">MODULE 07: PONG CORE<br>Mouse up/down to deflect. First to 5 wins.</div>
+  </div>
+  <script>
+    const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('overlay'), overlayMsg = document.getElementById('overlay-msg');
+    let p1 = {y: 110, s: 0}, p2 = {y: 110, s: 0}, ball = {x: 200, y: 150, vx: -4, vy: 4};
+    let loop;
+
+    canvas.addEventListener('mousemove', e => { p1.y = e.clientY - canvas.getBoundingClientRect().top - 30; });
+
+    function startGame() {
+      overlay.style.display = 'none';
+      p1.s = 0; p2.s = 0;
+      resetBall();
+      if(loop) clearInterval(loop);
+      loop = setInterval(update, 1000/60);
+    }
+
+    function resetBall() { ball.x = 200; ball.y = 150; ball.vx = ball.vx > 0 ? -4 : 4; ball.vy = (Math.random() > 0.5 ? 4 : -4); }
+
+    function update() {
+      ball.x += ball.vx; ball.y += ball.vy;
+      if(ball.y <= 0 || ball.y >= 290) ball.vy *= -1; // Wall bounce
+      
+      // AI Logic
+      p2.y += (ball.y - (p2.y + 30)) * 0.1;
+      
+      // Paddle bounds
+      p1.y = Math.max(0, Math.min(240, p1.y)); p2.y = Math.max(0, Math.min(240, p2.y));
+
+      // Collisions
+      if(ball.x <= 20 && ball.y+10 >= p1.y && ball.y <= p1.y+60) { ball.vx *= -1.1; ball.x = 20; }
+      if(ball.x >= 370 && ball.y+10 >= p2.y && ball.y <= p2.y+60) { ball.vx *= -1.1; ball.x = 370; }
+
+      // Scoring
+      if(ball.x < 0) { p2.s++; resetBall(); }
+      if(ball.x > 400) { p1.s++; resetBall(); }
+      
+      document.getElementById('score').innerText = `YOU: ${p1.s} | CPU: ${p2.s}`;
+      
+      if(p1.s === 5 || p2.s === 5) {
+        clearInterval(loop);
+        overlayMsg.innerText = p1.s === 5 ? "VICTORY" : "DEFEAT";
+        overlayMsg.style.color = p1.s === 5 ? "#00d2ff" : "#ff0055";
+        overlayMsg.style.display = 'block';
+        document.getElementById('action-btn').innerText = "REMATCH";
+        overlay.style.display = 'flex';
+      }
+      draw();
+    }
+
+    function draw() {
+      ctx.fillStyle = '#050508'; ctx.fillRect(0,0,400,300);
+      ctx.fillStyle = '#00d2ff'; ctx.fillRect(10, p1.y, 10, 60);
+      ctx.fillStyle = '#ff0055'; ctx.fillRect(380, p2.y, 10, 60);
+      ctx.fillStyle = '#fff'; ctx.fillRect(ball.x, ball.y, 10, 10);
+      ctx.setLineDash([5, 10]); ctx.beginPath(); ctx.moveTo(200, 0); ctx.lineTo(200, 300); ctx.strokeStyle = '#333355'; ctx.stroke();
+    }
+    draw();
+  </script>
+</body>
+</html>

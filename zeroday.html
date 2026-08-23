@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Viable Works - ZERO DAY</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; user-select: none; }
+    body { background-color: #050508; color: #ffffff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
+    .crt::before { content: " "; display: block; position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%); pointer-events: none; z-index: 100; }
+    #game-wrapper { width: 450px; background: #080812; border: 4px solid #1a1a3a; box-shadow: 0 0 20px rgba(0, 210, 255, 0.2); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; align-items: center; z-index: 10; }
+    .hud { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #00d2ff; padding-bottom: 10px; }
+    .back-btn { background: transparent; color: #ff0055; border: 2px solid #ff0055; padding: 8px 12px; font-size: 0.7rem; cursor: pointer; text-decoration: none; transition: 0.2s; }
+    .back-btn:hover { background: #ff0055; color: #000; box-shadow: 0 0 10px #ff0055; }
+    .score-board { text-align: right; }
+    #score { color: #00d2ff; font-size: 0.8rem; margin-bottom: 4px; }
+    #core-hp { color: #00ffaa; font-size: 0.6rem; margin-bottom: 4px; }
+    #threat-level { color: #8888aa; font-size: 0.55rem; }
+    #game-area { position: relative; }
+    canvas { border: 2px solid #333355; background: #050508; display: block; cursor: crosshair; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); }
+    #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 5, 8, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 20; border: 2px solid #333355; }
+    .action-btn { background: #111122; color: #00d2ff; border: 2px solid #00d2ff; padding: 15px 20px; font-size: 0.8rem; cursor: pointer; transition: 0.2s; }
+    .action-btn:hover { background: #00d2ff; color: #000; box-shadow: 0 0 15px #00d2ff; }
+    #overlay-msg { color: #ff0055; font-size: 0.8rem; margin-bottom: 20px; display: none; text-align: center; line-height: 1.5; }
+    #controls-hint { color: #8888aa; font-size: 0.55rem; margin-top: 15px; text-align: center; line-height: 1.6; }
+  </style>
+</head>
+<body class="crt">
+  <div id="game-wrapper">
+    <div class="hud">
+      <a href="index.html" class="back-btn">◄ SYS.DIR</a>
+      <div class="score-board">
+        <div id="score">PURGED: 000</div>
+        <div id="core-hp">CORE INTEGRITY: 100%</div>
+        <div id="threat-level">THREAT: LOW</div>
+      </div>
+    </div>
+    <div id="game-area">
+      <canvas id="canvas" width="400" height="400"></canvas>
+      <div id="overlay">
+        <div id="overlay-msg">CORE BREACHED</div>
+        <button class="action-btn" onclick="startGame()">DEFEND CORE</button>
+        <div id="controls-hint">[MOUSE / TOUCH]<br>Click incoming exploit nodes.<br><br><span style="color:#ffaa00">YELLOW</span> = Fast | <span style="color:#aa00ff">PURPLE</span> = Armored (2 hits)</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('overlay');
+
+    const CENTER_X = canvas.width / 2;
+    const CENTER_Y = canvas.height / 2;
+    const CORE_RADIUS = 28;
+
+    let score = 0;
+    let coreHp = 100;
+    let gameActive = false;
+    let animationId;
+    let exploits = [];
+    let particles = [];
+    let spawnTimer = 0;
+
+    function startGame() {
+      overlay.style.display = 'none';
+      score = 0;
+      coreHp = 100;
+      exploits = [];
+      particles = [];
+      spawnTimer = 0;
+      gameActive = true;
+      updateHud();
+      if (animationId) cancelAnimationFrame(animationId);
+      update();
+    }
+
+    function updateHud() {
+      document.getElementById('score').innerText = "PURGED: " + String(score).padStart(3, '0');
+      const hpText = document.getElementById('core-hp');
+      hpText.innerText = `CORE INTEGRITY: ${Math.max(0, coreHp)}%`;
+      hpText.style.color = coreHp > 50 ? '#00ffaa' : (coreHp > 25 ? '#ffaa00' : '#ff0055');
+
+      const threatText = document.getElementById('threat-level');
+      if (score >= 40) {
+        threatText.innerText = "THREAT: TERMINAL";
+        threatText.style.color = "#ff0055";
+      } else if (score >= 25) {
+        threatText.innerText = "THREAT: CRITICAL";
+        threatText.style.color = "#ffaa00";
+      } else if (score >= 12) {
+        threatText.innerText = "THREAT: ELEVATED";
+        threatText.style.color = "#00d2ff";
+      } else {
+        threatText.innerText = "THREAT: LOW";
+        threatText.style.color = "#8888aa";
+      }
+    }
+
+    function spawnExploit() {
+      const angle = Math.random() * Math.PI * 2;
+      const spawnDist = 220;
+      
+      // Special node types delayed until higher scores
+      let type = 'standard';
+      const rand = Math.random();
+      if (score >= 25 && rand < 0.3) {
+        type = 'armored';
+      } else if (score >= 12 && rand < 0.4) {
+        type = 'fast';
+      }
+
+      // Gentle movement speed to start
+      const speedMultiplier = 1 + (score * 0.03);
+      let baseSpeed = 0.3 + Math.random() * 0.25;
+      let hp = 1;
+      let radius = 13;
+      let color = '#ff0055';
+
+      if (type === 'fast') {
+        baseSpeed *= 1.6;
+        radius = 10;
+        color = '#ffaa00';
+      } else if (type === 'armored') {
+        baseSpeed *= 0.7;
+        hp = 2;
+        radius = 16;
+        color = '#aa00ff';
+      }
+
+      exploits.push({
+        x: CENTER_X + Math.cos(angle) * spawnDist,
+        y: CENTER_Y + Math.sin(angle) * spawnDist,
+        speed: baseSpeed * speedMultiplier,
+        radius: radius,
+        type: type,
+        hp: hp,
+        maxHp: hp,
+        color: color
+      });
+    }
+
+    function addExplosion(x, y, color, count = 10) {
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const spd = 1 + Math.random() * 3.5;
+        particles.push({
+          x: x, y: y,
+          vx: Math.cos(angle) * spd,
+          vy: Math.sin(angle) * spd,
+          life: 1.0,
+          color: color
+        });
+      }
+    }
+
+    function handleInteraction(clientX, clientY) {
+      if (!gameActive) return;
+      const rect = canvas.getBoundingClientRect();
+      const clickX = clientX - rect.left;
+      const clickY = clientY - rect.top;
+
+      for (let i = exploits.length - 1; i >= 0; i--) {
+        const e = exploits[i];
+        const dist = Math.hypot(e.x - clickX, e.y - clickY);
+        
+        // Expanded click grace margin (+18px)
+        if (dist <= e.radius + 18) {
+          e.hp--;
+          
+          if (e.hp <= 0) {
+            addExplosion(e.x, e.y, e.color, 12);
+            exploits.splice(i, 1);
+            score++;
+            updateHud();
+          } else {
+            e.color = '#ffffff';
+            setTimeout(() => { if (e) e.color = '#d880ff'; }, 80);
+            addExplosion(e.x, e.y, '#ffffff', 5);
+          }
+          break;
+        }
+      }
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      handleInteraction(e.clientX, e.clientY);
+    });
+
+    function update() {
+      if (!gameActive) return;
+
+      // Relaxed initial spawn rate (90 frames) scaling down with score
+      spawnTimer++;
+      const spawnThreshold = Math.max(12, 90 - Math.floor(score * 1.5));
+      if (spawnTimer >= spawnThreshold) {
+        spawnExploit();
+        spawnTimer = 0;
+      }
+
+      // Move exploits toward central core
+      for (let i = exploits.length - 1; i >= 0; i--) {
+        const e = exploits[i];
+        const angle = Math.atan2(CENTER_Y - e.y, CENTER_X - e.x);
+        e.x += Math.cos(angle) * e.speed;
+        e.y += Math.sin(angle) * e.speed;
+
+        // Check breach collision with central core
+        const distToCore = Math.hypot(CENTER_X - e.x, CENTER_Y - e.y);
+        if (distToCore <= CORE_RADIUS) {
+          const damage = e.type === 'armored' ? 20 : (e.type === 'fast' ? 8 : 10);
+          addExplosion(e.x, e.y, '#ff0055', 15);
+          exploits.splice(i, 1);
+          coreHp -= damage;
+          updateHud();
+
+          if (coreHp <= 0) {
+            triggerGameOver();
+            return;
+          }
+        }
+      }
+
+      // Update particle decay
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.045;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+
+      // Render Loop
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Radar rings
+      ctx.strokeStyle = 'rgba(0, 210, 255, 0.08)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(CENTER_X, CENTER_Y, 150, 0, Math.PI * 2);
+      ctx.arc(CENTER_X, CENTER_Y, 90, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Render Central Core
+      ctx.beginPath();
+      ctx.arc(CENTER_X, CENTER_Y, CORE_RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = coreHp > 50 ? '#00d2ff' : (coreHp > 25 ? '#ffaa00' : '#ff0055');
+      ctx.fill();
+      ctx.shadowColor = ctx.fillStyle;
+      ctx.shadowBlur = 15;
+
+      // Render Exploits
+      exploits.forEach(e => {
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
+        ctx.fillStyle = e.color;
+        ctx.fill();
+        ctx.shadowColor = e.color;
+        ctx.shadowBlur = 10;
+      });
+
+      // Render Particles
+      particles.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3 * p.life, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+      });
+
+      ctx.shadowBlur = 0;
+
+      if (gameActive) animationId = requestAnimationFrame(update);
+    }
+
+    function triggerGameOver() {
+      gameActive = false;
+      document.getElementById('overlay-msg').style.display = 'block';
+      document.querySelector('.action-btn').innerText = "REBOOT CORE";
+      document.getElementById('controls-hint').style.display = 'none';
+      overlay.style.display = 'flex';
+    }
+  </script>
+</body>
+</html>

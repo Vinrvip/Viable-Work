@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Viable Works - TRACE ROUTE</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Press Start 2P', monospace; user-select: none; }
+    body { background-color: #050508; color: #ffffff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden;}
+    .crt::before { content: " "; display: block; position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%); pointer-events: none; z-index: 100; }
+    #game-wrapper { width: 450px; background: #080812; border: 4px solid #1a1a3a; box-shadow: 0 0 20px rgba(0, 210, 255, 0.2); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; align-items: center; z-index: 10; }
+    .hud { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #00d2ff; padding-bottom: 10px; }
+    .back-btn { background: transparent; color: #ff0055; border: 2px solid #ff0055; padding: 8px 12px; font-size: 0.7rem; cursor: pointer; text-decoration: none; transition: 0.2s; }
+    .back-btn:hover { background: #ff0055; color: #000; box-shadow: 0 0 10px #ff0055; }
+    .score-board { text-align: right; }
+    #score { color:#00d2ff; font-size:0.8rem; margin-bottom: 5px; }
+    #high-score { color:#8888aa; font-size:0.6rem; }
+    #game-area { position: relative; }
+    canvas { border: 2px solid #333355; background: #050508; display: block; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); }
+    #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 5, 8, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 20; border: 2px solid #333355; }
+    .action-btn { background: #111122; color: #00d2ff; border: 2px solid #00d2ff; padding: 15px 20px; font-size: 0.8rem; cursor: pointer; transition: 0.2s; }
+    .action-btn:hover { background: #00d2ff; color: #000; box-shadow: 0 0 15px #00d2ff; }
+    #overlay-msg { color: #ff0055; font-size: 0.8rem; margin-bottom: 20px; display: none; text-align:center; line-height: 1.5; }
+  </style>
+</head>
+<body class="crt">
+  <div id="game-wrapper">
+    <div class="hud">
+      <a href="index.html" class="back-btn">◄ SYS.DIR</a>
+      <div class="score-board">
+        <div id="score">DEPTH: 000</div>
+        <div id="high-score">NODE: TRACE</div>
+      </div>
+    </div>
+    <div id="game-area">
+      <canvas id="canvas" width="400" height="400"></canvas>
+      <div id="overlay">
+        <div id="overlay-msg">TRACE INTERCEPTED</div>
+        <button class="action-btn" onclick="startGame()">INITIATE ROUTE</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('overlay');
+    
+    // PLAYER SPEED: Increased slightly from 4 to 5 for more responsive dodging
+    let player = { x: 50, y: 200, size: 10, speed: 5 };
+    let walls = [];
+    let score = 0;
+    let gameActive = false;
+    let animationId;
+    let frameCount = 0;
+    const keys = { ArrowUp: false, ArrowDown: false };
+
+    window.addEventListener('click', function() { window.focus(); });
+    document.addEventListener('keydown', (e) => { if(keys.hasOwnProperty(e.key)) keys[e.key] = true; });
+    document.addEventListener('keyup', (e) => { if(keys.hasOwnProperty(e.key)) keys[e.key] = false; });
+
+    function startGame() {
+      overlay.style.display = 'none';
+      walls = [];
+      score = 0;
+      frameCount = 0;
+      player.y = 200;
+      gameActive = true;
+      document.getElementById('score').innerText = "DEPTH: 000";
+      if(animationId) cancelAnimationFrame(animationId);
+      update();
+    }
+
+    function update() {
+      if(!gameActive) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      frameCount++;
+      
+      if(frameCount % 10 === 0) {
+        score++;
+        document.getElementById('score').innerText = "DEPTH: " + (score < 10 ? "00"+score : (score < 100 ? "0"+score : score));
+      }
+
+      if(keys.ArrowUp) player.y -= player.speed;
+      if(keys.ArrowDown) player.y += player.speed;
+      if(player.y < 0) player.y = 0;
+      if(player.y > canvas.height - player.size) player.y = canvas.height - player.size;
+
+      // EASIER WALL SPEED: Starts at 2 (was 3) and speeds up much slower
+      let wallSpeed = 2 + (score / 400); 
+      
+      // EASIER GAPS: Starts at 160 (was 120), shrinks slower, and never gets smaller than 90 (was 60)
+      let gap = Math.max(160 - (score / 15), 90);
+
+      // EASIER FREQUENCY: Spawns a wall every 90 frames instead of every 60 frames
+      if(frameCount % 90 === 0) {
+        let topHeight = Math.random() * (canvas.height - gap - 40) + 20;
+        walls.push({ x: canvas.width, top: topHeight, bottom: canvas.height - topHeight - gap, w: 30 });
+      }
+
+      ctx.fillStyle = '#00ffaa';
+      ctx.fillRect(player.x, player.y, player.size, player.size);
+
+      ctx.fillStyle = '#ff0055';
+      for(let i = 0; i < walls.length; i++) {
+        let w = walls[i];
+        w.x -= wallSpeed;
+        
+        ctx.fillRect(w.x, 0, w.w, w.top);
+        ctx.fillRect(w.x, canvas.height - w.bottom, w.w, w.bottom);
+
+        // Collision Check
+        if(player.x < w.x + w.w && player.x + player.size > w.x) {
+          if(player.y < w.top || player.y + player.size > canvas.height - w.bottom) {
+            triggerGameOver();
+            return;
+          }
+        }
+      }
+      
+      walls = walls.filter(w => w.x + w.w > 0);
+      if(gameActive) animationId = requestAnimationFrame(update);
+    }
+
+    function triggerGameOver() {
+      gameActive = false;
+      document.getElementById('overlay-msg').style.display = 'block';
+      document.querySelector('.action-btn').innerText = "REROUTE";
+      overlay.style.display = 'flex';
+    }
+  </script>
+</body>
+</html>
